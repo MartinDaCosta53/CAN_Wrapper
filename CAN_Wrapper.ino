@@ -81,6 +81,8 @@
 // 3rd party libraries
 #include <Streaming.h>
 
+//Define additional required 3rd party libraries here
+
 
 // CBUS library header files
 #include <CBUS2515.h>            // CAN controller and CBUS class
@@ -244,6 +246,11 @@ void eventhandler(byte index, CANFrame *msg)
   switch (opc) {
 
     case OPC_ACON:
+	
+	// case code goes here
+   
+      break;
+	  
     case OPC_ASON:
     
    // case code goes here
@@ -251,6 +258,11 @@ void eventhandler(byte index, CANFrame *msg)
       break;
 
     case OPC_ACOF:
+	
+	// case code goes here
+   
+      break;
+	  
     case OPC_ASOF:
     
    // case code goes here
