@@ -81,8 +81,6 @@
 // 3rd party libraries
 #include <Streaming.h>
 
-//Define additional required 3rd party libraries here
-
 
 // CBUS library header files
 #include <CBUS2515.h>            // CAN controller and CBUS class
@@ -97,11 +95,21 @@ unsigned char mname[7] = { 'C', 'A', 'N', 'w', 'r', 'a', 'p' };
 
 // constants
 const byte VER_MAJ = 1;         // code major version
-const char VER_MIN = ' ';       // code minor version
+const byte VER_MIN = 2;       // code minor version
 const byte VER_BETA = 0;        // code beta sub-version
 const byte MODULE_ID = 99;      // CBUS module type
 
-const unsigned long CAN_OSC_FREQ = 8000000;     // Oscillator frequency on the CAN2515 board
+const unsigned long CAN_OSC_FREQ = 16000000;     // Oscillator frequency on the CAN2515 board
+
+// Forward Function declarations
+void framehandler(CANFrame *msg);
+
+// User list of opcodes.  This list is an example and can be changed as required. List is retained in program memory
+const byte opcodes[] PROGMEM = {OPC_DFNON, OPC_DFNOF, OPC_DSPD, OPC_GLOC, OPC_KLOC, OPC_PLOC};
+
+// Calculate number of opcodes in list
+const byte nopcodes = sizeof(opcodes) / sizeof(opcodes[0]);
+DEBUG_PRINT(F("> Number of op codes ") << nopcodes);
 
 //Define inputs here
 //Define outputs here
@@ -118,9 +126,9 @@ const unsigned long CAN_OSC_FREQ = 8000000;     // Oscillator frequency on the C
 //CBUS pins
 const byte CAN_INT_PIN = 2;  // Only pin 2 and 3 support interrupts
 const byte CAN_CS_PIN = 10;
-//const byte CAN_SI_PIN = 11;  // Cannot be changed
-//const byte CAN_SO_PIN = 12;  // Cannot be changed
-//const byte CAN_SCK_PIN = 13;  // Cannot be changed
+//const byte CAN_SI_PIN = 11;  Pin 50 on Mega. Cannot be changed. Here as a comment for information only.
+//const byte CAN_SO_PIN = 12;  Pin 51 on Mega. Cannot be changed. Here as a comment for information only. 
+//const byte CAN_SCK_PIN = 13;  Pin 52 on Mega. Cannot be changed. Here as a comment for information only.
 
 // CBUS objects
 CBUS2515 CBUS;                      // CBUS object
@@ -161,6 +169,8 @@ void setupCBUS()
 
   // register our CBUS event handler, to receive event messages of learned events
   CBUS.setEventHandler(eventhandler);
+  // register our CBUS frame handler to receive messages in user list
+  CBUS.setFrameHandler(framehandler, (byte *) opcodes, nopcodes);
 
   // configure and start CAN bus and CBUS message processing
   CBUS.setNumBuffers(2);         // more buffers = more memory used, fewer = less
@@ -200,14 +210,12 @@ void loop()
   processSerialInput();
 
   // Put module loop() code here
- 
+
 
 
 }
 
-
-
-// Send an event routine
+// Send an event
 bool sendEvent(byte opCode, unsigned int eventNo)
 {
   CANFrame msg;
@@ -221,7 +229,65 @@ bool sendEvent(byte opCode, unsigned int eventNo)
 
   bool success = CBUS.sendMessage(&msg);
   if (success) {
-    DEBUG_PRINT(F("> sent CBUS message with Event Number ") << eventNo);
+    DEBUG_PRINT(F("> sent CBUS event with Event Number ") << eventNo);
+  } else {
+    DEBUG_PRINT(F("> error sending CBUS message"));
+  }
+  return success;
+}
+
+// Send an event with one data byte
+bool sendEvent(byte opCode, unsigned int eventNo, byte data1)
+{
+  CANFrame msg;
+  msg.id = config.CANID;
+  msg.len = 6;
+  msg.data[0] = opCode;
+  msg.data[1] = highByte(config.nodeNum);
+  msg.data[2] = lowByte(config.nodeNum);
+  msg.data[3] = highByte(eventNo);
+  msg.data[4] = lowByte(eventNo);
+  msg.data[5] = data1;
+
+  bool success = CBUS.sendMessage(&msg);
+  if (success) {
+    DEBUG_PRINT(F("> sent CBUS event with data byte ") << data1);
+  } else {
+    DEBUG_PRINT(F("> error sending CBUS message"));
+  }
+  return success;
+}
+
+// Send a frame with op code only (eg OPC_ARST)
+bool sendFrame(byte opCode)
+{
+	CANFrame msg;
+	msg.id = config.CANID;
+	msg.len = 1;
+	msg.data[0] = opCode;
+	
+	bool success = CBUS.sendMessage(&msg);
+	if (success) {
+    DEBUG_PRINT(F("> sent CBUS message op code only ") << _HEX(opCode));
+  } else {
+    DEBUG_PRINT(F("> error sending CBUS message"));
+  }
+  return success;
+}
+
+// Send a frame with op code and 2 data bytes (eg OPC_DFNON)
+bool sendFrame(byte opCode, byte data1, byte data2)
+{
+	CANFrame msg;
+	msg.id = config.CANID;
+	msg.len = 3;
+	msg.data[0] = opCode;
+	msg.data[1] = data1;
+	msg.data[2] = data2;
+	
+	bool success = CBUS.sendMessage(&msg);
+	if (success) {
+    DEBUG_PRINT(F("> sent CBUS message op Code ") << _HEX(opCode) << F("> data byte 1 ") << _HEX(data1) << F("> data byte 2 ") << _HEX(data2));
   } else {
     DEBUG_PRINT(F("> error sending CBUS message"));
   }
@@ -233,7 +299,6 @@ bool sendEvent(byte opCode, unsigned int eventNo)
 //
 void eventhandler(byte index, CANFrame *msg)
 {
-  byte opc = msg->data[0];
 
   DEBUG_PRINT(F("> event handler: index = ") << index << F(", opcode = 0x") << _HEX(msg->data[0]));
   DEBUG_PRINT(F("> event handler: length = ") << msg->len);
@@ -241,33 +306,50 @@ void eventhandler(byte index, CANFrame *msg)
   unsigned int node_number = (msg->data[1] << 8 ) + msg->data[2];
   unsigned int event_number = (msg->data[3] << 8 ) + msg->data[4];
   DEBUG_PRINT(F("> NN = ") << node_number << F(", EN = ") << event_number);
-  DEBUG_PRINT(F("> op_code = ") << opc);
+  DEBUG_PRINT(F("> op_code = ") << msg->data[0]);
 
-  switch (opc) {
-
+  switch (msg->data[0])
+  {
+// Add a case for each taught event op code used
     case OPC_ACON:
-	
-	// case code goes here
-   
-      break;
-	  
-    case OPC_ASON:
     
-   // case code goes here
-   
+      // case code goes here
+
       break;
 
     case OPC_ACOF:
-	
-	// case code goes here
    
+      // case code goes here
+
       break;
-	  
-    case OPC_ASOF:
-    
-   // case code goes here
-   
+  }
+}
+
+//
+/// called from the CBUS library when a message is received with an OpCode in the user list
+//
+void framehandler(CANFrame *msg)
+{
+
+  DEBUG_PRINT(F("> handling frame with opcode = 0x") << _HEX(msg->data[0]));
+
+  switch (msg->data[0])
+  {
+    // insert a case for each opcode in the user list
+
+    case OPC_DFNON:
+
+      // case code goes here
+
       break;
+
+    case OPC_DFNOF:
+
+      //case code goes here
+      break;
+
+      // and so on for all user list op codes
+
   }
 }
 
@@ -279,7 +361,7 @@ void printConfig(void)
   Serial << F("> compiled on ") << __DATE__ << F(" at ") << __TIME__ << F(", compiler ver = ") << __cplusplus << endl;
 
   // copyright
-  Serial << F("> © Martin Da Costa (MERG M6223) 2021") << endl;
+  Serial << F("> © Martin Da Costa (MERG M6223) 2021 & 2022") << endl;
   Serial << F("> © Duncan Greenwood (MERG M5767) 2021") << endl;
   Serial << F("> © John Fletcher (MERG M6777) 2021") << endl;
   Serial << F("> © Sven Rosvall (MERG M3777) 2021") << endl;
