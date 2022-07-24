@@ -33,7 +33,7 @@ The MCP2515 interface requires five Arduino pins to be allocated. Three of these
 in the architecture of the Arduino processor. One pin must be connected to an interrupt
 capable Arduino pin. Thus, the total number of pins available for input or output is:
 - UNO  13 pins
-- NANO 15 pins
+- NANO 15 pins (Note that two of these, A6 & A7, are analogue inputs only.
 - MEGA 63 pins
 
 **It is the users responsibility that the total current that the Arduino is asked to supply 
