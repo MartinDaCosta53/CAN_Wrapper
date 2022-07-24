@@ -79,8 +79,6 @@ const unsigned long CAN_OSC_FREQ = 8000000;     // Oscillator frequency on the C
 If the oscillator frequency on your CAN2515 board is not 8MHz, change the number to match. The 
 module will not work if this number does not match the oscillator frequency.
 
-```
-
 
 
 ### CBUS Op Codes
