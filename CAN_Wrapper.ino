@@ -95,7 +95,7 @@ unsigned char mname[7] = { 'C', 'A', 'N', 'w', 'r', 'a', 'p' };
 
 // constants
 const byte VER_MAJ = 1;         // code major version
-const byte VER_MIN = 2;       // code minor version
+const byte VER_MIN = 3;       // code minor version
 const byte VER_BETA = 0;        // code beta sub-version
 const byte MODULE_ID = 99;      // CBUS module type
 
@@ -104,12 +104,12 @@ const unsigned long CAN_OSC_FREQ = 16000000;     // Oscillator frequency on the 
 // Forward Function declarations
 void framehandler(CANFrame *msg);
 
-// User list of opcodes.  This list is an example and can be changed as required. List is retained in program memory
-const byte opcodes[] PROGMEM = {OPC_DFNON, OPC_DFNOF, OPC_DSPD, OPC_GLOC, OPC_KLOC, OPC_PLOC};
+// User list of opcodes.  This list is an example and can be changed as required.
+const byte opcodes[] = {OPC_DFNON, OPC_DFNOF, OPC_DSPD, OPC_GLOC, OPC_KLOC, OPC_PLOC};
 
 // Calculate number of opcodes in list
 const byte nopcodes = sizeof(opcodes) / sizeof(opcodes[0]);
-DEBUG_PRINT(F("> Number of op codes ") << nopcodes);
+
 
 //Define inputs here
 //Define outputs here
@@ -185,6 +185,7 @@ void setupCBUS()
 void setupModule()
 {
   //Module setup code goes here for calling by setup()
+  DEBUG_PRINT(F("> Number of op codes ") << nopcodes);
 }
 
 
